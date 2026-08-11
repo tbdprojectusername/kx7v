@@ -9,3 +9,5 @@ sub-polls per run) and commits the raw quotes to `data/`.
 
 Data is scraped from publicly available sources and published as-is, with no warranty of
 accuracy or completeness. Nothing here constitutes betting advice.
+
+<!-- capture pipeline active -->
