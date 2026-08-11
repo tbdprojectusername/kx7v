@@ -4,8 +4,6 @@ name: poll-odds
 # run does five spaced sub-polls instead. This repo is PUBLIC, so runner minutes are
 # unlimited and free — the sleeps cost nothing here. Scoring lives in the private repo.
 on:
-  push:
-    branches: [master]
   schedule:
     - cron: "0 * * * *"
   workflow_dispatch:
