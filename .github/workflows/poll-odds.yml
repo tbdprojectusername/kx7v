@@ -1,0 +1,63 @@
+name: poll-odds
+
+# GitHub throttles cron hard (we measured ~13 fired runs/day on "*/20"), so one hourly
+# run does five spaced sub-polls instead. This repo is PUBLIC, so runner minutes are
+# unlimited and free — the sleeps cost nothing here. Scoring lives in the private repo.
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: odds-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 58
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Poll loop
+        run: |
+          git config user.name  "odds-capture-bot"
+          git config user.email "actions@github.com"
+          PUSH_FAIL=0
+          for i in 1 2 3 4 5; do
+            echo "=== poll $i of 5 ==="
+            python poll_bfo.py --out-dir data || echo "BFO_FAILED=1" >> "$GITHUB_ENV"
+            python poll_pinnacle.py --out-dir data || echo "PIN_FAILED=1" >> "$GITHUB_ENV"
+            git add data
+            if ! git diff --cached --quiet; then
+              git commit -m "odds: poll $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              OK=0
+              for a in 1 2 3; do
+                git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && \
+                git push origin "HEAD:${GITHUB_REF_NAME}" && OK=1 && break
+                echo "push attempt $a failed, retrying"; sleep 5
+              done
+              # $GITHUB_ENV only reaches LATER steps — a same-step test needs the shell var.
+              if [ "$OK" -ne 1 ]; then
+                PUSH_FAIL=1
+                echo "PUSH_FAIL=1" >> "$GITHUB_ENV"
+              fi
+            else
+              echo "no new rows on poll $i"
+            fi
+            [ "$i" -lt 5 ] && sleep 600
+          done
+          [ "$PUSH_FAIL" -eq 0 ] || { echo "::error::a poll commit failed to push"; exit 1; }
+
+      - name: Flag scraper failures
+        if: env.BFO_FAILED == '1' || env.PIN_FAILED == '1'
+        run: |
+          echo "::warning::a scraper failed this cycle (BFO=$BFO_FAILED PIN=$PIN_FAILED)"
