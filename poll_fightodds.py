@@ -56,6 +56,8 @@ EXCHANGES = {"novig", "prophetx", "prophet x", "prophet exchange", "polymarket",
              "polymarket(us)", "sporttrade", "betopenly", "kalshi", "smarkets",
              "betfair", "sxbet", "sx bet", "4casters", "4cx"}
 OVERROUND_LO, OVERROUND_HI = 0.90, 1.35
+FLIP_TOL = 0.25   # cross-book side-probability gap that can only mean a flipped quote
+FLIP_MIN_BOOKS = 3
 HEARTBEAT_H = 24.0
 MIN_INTERVAL = 1.0  # seconds between request starts, global (single worker)
 
@@ -273,6 +275,7 @@ def parse_event(data: dict, ev: dict, poll_iso: str):
         oconn = f.get("offers") or {}
         if (oconn.get("pageInfo") or {}).get("hasNextPage"):
             raise EventFailed(f">100 offers on {f.get('slug')} — refusing to truncate")
+        fight_rows = []
         for oe in oconn.get("edges") or []:
             o = oe.get("node") or {}
             sb = o.get("sportsbook") or {}
@@ -302,7 +305,7 @@ def parse_event(data: dict, ev: dict, poll_iso: str):
                 quar += 1
                 continue
             src_ts = _parse_ts(o.get("timestamp"))
-            rows.append({
+            fight_rows.append({
                 "poll_time": poll_iso, "event_pk": ev["pk"], "pair": pair,
                 "fight_slug": f.get("slug") or "", "event_date": ev["date"],
                 "event_name": ev["name"], "promotion": ev["promotion"],
@@ -314,6 +317,30 @@ def parse_event(data: dict, ev: dict, poll_iso: str):
                 "source_change_age_h": _age_h(poll_iso, src_ts) if src_ts else "",
                 "cycle_status": "",  # stamped at write time
             })
+        # Cross-book flip guard. A book whose implied side1 probability sits on the
+        # opposite side of the field has its two outcomes transposed AT THE SOURCE
+        # (observed 2026-08-13: one book quoting a -450 favourite at +350 while
+        # sixteen others agreed). Slug orientation cannot catch it — the source's
+        # own labels are wrong — so the field is the only available anchor.
+        # Needs >=3 books to have a field at all; below that we cannot check and
+        # the row is kept (its price still faces the executable floor downstream).
+        if len(fight_rows) >= FLIP_MIN_BOOKS:
+            qs = []
+            for r_ in fight_rows:
+                i1, i2 = 1 / float(r_["dec1"]), 1 / float(r_["dec2"])
+                qs.append(i1 / (i1 + i2))
+            srt = sorted(qs)
+            med = srt[len(srt) // 2] if len(srt) % 2 else (srt[len(srt) // 2 - 1] + srt[len(srt) // 2]) / 2
+            kept = []
+            for r_, q_ in zip(fight_rows, qs):
+                if abs(q_ - med) > FLIP_TOL:
+                    print(f"  FLIP quarantine: {r_['book']} on {r_['fight_slug']} "
+                          f"(q={q_:.2f} vs field {med:.2f})", flush=True)
+                    quar += 1
+                else:
+                    kept.append(r_)
+            fight_rows = kept
+        rows.extend(fight_rows)
     return rows, quar
 
 

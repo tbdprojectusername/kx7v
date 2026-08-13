@@ -181,5 +181,36 @@ class WriteTests(unittest.TestCase):
             self.assertTrue((df.cycle_status == "complete").all())
 
 
+
+class FlipGuardTests(unittest.TestCase):
+    """A source-mislabelled book (outcomes transposed) must be quarantined by the field."""
+
+    def fight_with(self, prices):
+        offers = [offer(bk, [outcome("israel-adesanya", a), outcome("jan-blachowicz", b)])
+                  for bk, (a, b) in prices.items()]
+        return payload([fight("f-1", ADESANYA, BLACHOWICZ, offers)])
+
+    def test_flipped_book_quarantined_when_field_disagrees(self):
+        rows, quar = parse_event(self.fight_with({
+            "BetOnline": (-450, 350), "Pinnacle": (-444, 350), "Stake": (-455, 340),
+            "Bet105": (350, -444),          # transposed at the source
+        }), EV, POLL)
+        self.assertEqual(quar, 1)
+        self.assertNotIn("Bet105", {r["book"] for r in rows})
+        self.assertEqual(len(rows), 3)
+
+    def test_genuine_disagreement_survives(self):
+        # real price dispersion on a near-pick'em must NOT trip the guard
+        rows, quar = parse_event(self.fight_with({
+            "BetOnline": (-120, 100), "Pinnacle": (-110, -110), "Stake": (100, -120),
+        }), EV, POLL)
+        self.assertEqual((len(rows), quar), (3, 0))
+
+    def test_no_guard_below_three_books(self):
+        rows, quar = parse_event(self.fight_with({
+            "BetOnline": (-450, 350), "Bet105": (350, -444),
+        }), EV, POLL)
+        self.assertEqual((len(rows), quar), (2, 0))
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
