@@ -29,6 +29,7 @@ jobs:
         run: |
           git config user.name  "odds-capture-bot"
           git config user.email "actions@github.com"
+          git config merge.keepmine.driver "true"
           PUSH_FAIL=0
           for i in 1 2 3 4 5; do
             echo "=== poll $i of 5 ==="

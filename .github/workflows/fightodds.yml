@@ -56,6 +56,7 @@ jobs:
           fi
           git config user.name  "odds-capture-bot"
           git config user.email "actions@github.com"
+          git config merge.keepmine.driver "true"
           PUSH_FAIL=0
           for i in 1 2 3 4 5 6; do
             echo "=== fightodds poll $i of 6 ==="
@@ -68,8 +69,6 @@ jobs:
             elif [ "$rc" -ne 0 ]; then
               exit "$rc"
             fi
-            # aux source: ~3 requests, fail-soft
-            python poll_miseojeu.py --out-dir data || echo "::warning::aux poll failed"
             git add data
             if ! git diff --cached --quiet; then
               git commit -m "sync: $(date -u +%Y-%m-%dT%H:%M:%SZ)"

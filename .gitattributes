@@ -3,3 +3,8 @@
 # (2026-08-13: a queued fightodds run raced the prior run's final push and died
 # mid-rebase; consumers already dedupe on read, so union is safe here.)
 data/*.csv merge=union
+
+# Cycle manifests are regenerated every poll; two runs writing different
+# timestamps must never conflict. `keepmine` is a no-op driver (see the
+# git config line in the workflows) that accepts the current content.
+data/*_cycle_latest.json merge=keepmine
