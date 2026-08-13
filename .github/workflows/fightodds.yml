@@ -68,6 +68,8 @@ jobs:
             elif [ "$rc" -ne 0 ]; then
               exit "$rc"
             fi
+            # Mise-o-jeu+ (operator's book): ~3 requests, fail-soft
+            python poll_miseojeu.py --out-dir data || echo "::warning::miseojeu poll failed"
             git add data
             if ! git diff --cached --quiet; then
               git commit -m "fightodds: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
