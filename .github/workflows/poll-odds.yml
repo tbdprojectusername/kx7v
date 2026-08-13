@@ -41,6 +41,7 @@ jobs:
               git commit -m "odds: poll $(date -u +%Y-%m-%dT%H:%M:%SZ)"
               OK=0
               for a in 1 2 3; do
+                git rebase --abort >/dev/null 2>&1 || true
                 git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && \
                 git push origin "HEAD:${GITHUB_REF_NAME}" && OK=1 && break
                 echo "push attempt $a failed, retrying"; sleep 5
