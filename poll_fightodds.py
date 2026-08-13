@@ -56,7 +56,7 @@ EXCHANGES = {"novig", "prophetx", "prophet x", "prophet exchange", "polymarket",
              "polymarket(us)", "sporttrade", "betopenly", "kalshi", "smarkets",
              "betfair", "sxbet", "sx bet", "4casters", "4cx"}
 OVERROUND_LO, OVERROUND_HI = 0.90, 1.35
-FLIP_TOL = 0.25   # cross-book side-probability gap that can only mean a flipped quote
+FLIP_MARGIN = 0.02   # mirror test must beat the direct fit by this much to call a flip
 FLIP_MIN_BOOKS = 3
 HEARTBEAT_H = 24.0
 MIN_INTERVAL = 1.0  # seconds between request starts, global (single worker)
@@ -333,7 +333,10 @@ def parse_event(data: dict, ev: dict, poll_iso: str):
             med = srt[len(srt) // 2] if len(srt) % 2 else (srt[len(srt) // 2 - 1] + srt[len(srt) // 2]) / 2
             kept = []
             for r_, q_ in zip(fight_rows, qs):
-                if abs(q_ - med) > FLIP_TOL:
+                # mirror test: is this row closer to the field's TRANSPOSE than to the
+                # field? A fixed gap misses near-pick'ems (flipping a -140 favourite
+                # moves the probability only ~16pp) yet those rows still fabricate arbs.
+                if abs(q_ - (1 - med)) + FLIP_MARGIN < abs(q_ - med):
                     print(f"  FLIP quarantine: {r_['book']} on {r_['fight_slug']} "
                           f"(q={q_:.2f} vs field {med:.2f})", flush=True)
                     quar += 1
