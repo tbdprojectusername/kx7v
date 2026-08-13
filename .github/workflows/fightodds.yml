@@ -2,10 +2,13 @@ name: fightodds
 
 # SHADOW-ONLY FightOdds capture (design: private repo CLAUDE_HANDOFF_FIGHTODDS_CAPTURE.md).
 # Current UFC/DWCS moneylines from api.fightodds.io — one polite pass per run
-# (~22 requests at >=1s spacing). Manual canaries first; the hourly cron is
-# enabled only after they pass from GitHub runner IPs. Runs ONCE per hour,
-# never inside the 5 BFO sub-polls.
+# (~22 requests at >=1s spacing). GitHub-IP canaries passed 2026-08-13
+# (discovery 200/1.2s; UFC 330 = 326 quotes/29 books; full cycle 20/20 events,
+# 530 rows, 0 failures). Hourly at :30 — offset from the :00 BFO poll job so
+# their commits never race; never inside the 5 BFO sub-polls.
 on:
+  schedule:
+    - cron: "30 * * * *"
   workflow_dispatch:
     inputs:
       mode:
