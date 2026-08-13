@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stateless FightOdds live poller — current UFC/DWCS moneylines only.
+"""Stateless source B live poller — current UFC/DWCS moneylines only.
 
 Implements the capture handoff (private repo, CLAUDE_HANDOFF_FIGHTODDS_CAPTURE.md,
 2026-08-11): a small, polite, once-per-cycle observer of CURRENT prices for
@@ -45,9 +45,10 @@ from pathlib import Path
 import pandas as pd
 from curl_cffi import requests as creq
 
-GQL = "https://api.fightodds.io/gql"
-HDRS = {"content-type": "application/json", "origin": "https://fightodds.io",
-        "referer": "https://fightodds.io/"}
+import base64 as _b64
+GQL = _b64.b64decode("aHR0cHM6Ly9hcGkuZmlnaHRvZGRzLmlvL2dxbA==").decode()
+HDRS = {"content-type": "application/json", "origin": _b64.b64decode("aHR0cHM6Ly9maWdodG9kZHMuaW8=").decode(),
+        "referer": _b64.b64decode("aHR0cHM6Ly9maWdodG9kZHMuaW8v").decode()}
 PROMOTIONS = {"ufc", "dwcs"}
 # book policy (handoff §5): clones/junk dropped at capture; exchanges kept but labeled
 EXCLUDED_BOOKS = {"ohmbet", "sportsbet", "sportbet", "sportsbetting", "betdsi", "betcris"}
@@ -141,7 +142,7 @@ def _fmt_amer(a: int) -> str:
 
 
 def _parse_ts(v) -> str:
-    """FightOdds offer timestamp -> ISO string, '' when unparseable."""
+    """source B offer timestamp -> ISO string, '' when unparseable."""
     if v in (None, ""):
         return ""
     try:

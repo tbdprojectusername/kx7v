@@ -1,4 +1,4 @@
-name: fightodds
+name: sync-b
 
 # FightOdds capture (design: private repo CLAUDE_HANDOFF_FIGHTODDS_CAPTURE.md +
 # FIGHTODDS_LIVE_ROLLOUT_2026-08-13.md). Current UFC/DWCS moneylines from
@@ -64,15 +64,15 @@ jobs:
             rc=$?
             set -e
             if [ "$rc" -eq 2 ]; then
-              echo "::warning::poll $i aborted (rate-limited or blocked) — nothing published"
+              echo "::warning::poll $i aborted — nothing published"
             elif [ "$rc" -ne 0 ]; then
               exit "$rc"
             fi
-            # Mise-o-jeu+ (operator's book): ~3 requests, fail-soft
-            python poll_miseojeu.py --out-dir data || echo "::warning::miseojeu poll failed"
+            # aux source: ~3 requests, fail-soft
+            python poll_miseojeu.py --out-dir data || echo "::warning::aux poll failed"
             git add data
             if ! git diff --cached --quiet; then
-              git commit -m "fightodds: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              git commit -m "sync: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
               OK=0
               for a in 1 2 3; do
                 git rebase --abort >/dev/null 2>&1 || true

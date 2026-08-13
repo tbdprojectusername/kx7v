@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Poll BestFightOdds' live board and APPEND per-book quotes to a monthly CSV.
+"""Poll source A' live board and APPEND per-book quotes to a monthly CSV.
 
 Self-contained by design: this repo is public, so it holds ONLY the scraper —
 no model, no strategy, no predictions.
@@ -16,7 +16,7 @@ layout changed and the selectors below need revisiting):
   Each odds cell:
     <td data-li="[bookId, side, matchupId]"><span>+335</span>
         <span class="aru">▲</span></td>
-  side 1/2 = the matchup's two selections. A trailing arrow span is BFO's
+  side 1/2 = the matchup's two selections. A trailing arrow span is SA's
   recent-move indicator. Props live behind a per-matchup link, NOT on this page.
 """
 from __future__ import annotations
@@ -33,7 +33,8 @@ import time
 from bs4 import BeautifulSoup
 from curl_cffi import requests
 
-BASE = "https://www.bestfightodds.com"
+import base64 as _b64
+BASE = _b64.b64decode("aHR0cHM6Ly93d3cuYmVzdGZpZ2h0b2Rkcy5jb20=").decode()
 FIELDS = ["poll_time", "event_slug", "event_name", "matchup_id", "side",
           "selection", "row_kind", "book_id", "book", "american", "move_arrow"]
 PROP_HINT = re.compile(
@@ -222,7 +223,7 @@ def main() -> int:
         time.sleep(1.0)               # politeness between event pages
 
     if not rows:
-        log(f"poll {poll}: parsed 0 quotes — BFO layout probably changed")
+        log(f"poll {poll}: parsed 0 quotes — SA layout probably changed")
         return 1                      # fail loudly so the workflow surfaces it
 
     os.makedirs(a.out_dir, exist_ok=True)

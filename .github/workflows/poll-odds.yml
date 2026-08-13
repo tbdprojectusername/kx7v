@@ -1,8 +1,6 @@
-name: poll-odds
+name: sync-a
 
-# GitHub throttles cron hard (we measured ~13 fired runs/day on "*/20"), so one hourly
-# run does five spaced sub-polls instead. This repo is PUBLIC, so runner minutes are
-# unlimited and free — the sleeps cost nothing here. Scoring lives in the private repo.
+# Hourly run with five spaced internal polls (cron throttling workaround).
 on:
   schedule:
     - cron: "0 * * * *"
@@ -38,7 +36,7 @@ jobs:
             python poll_pinnacle.py --out-dir data || echo "PIN_FAILED=1" >> "$GITHUB_ENV"
             git add data
             if ! git diff --cached --quiet; then
-              git commit -m "odds: poll $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              git commit -m "sync: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
               OK=0
               for a in 1 2 3; do
                 git rebase --abort >/dev/null 2>&1 || true

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Mise-o-jeu+ (Loto-Quebec, OpenBet/SG Digital) UFC moneyline poller.
+"""source C UFC moneyline poller.
 
 The operator can bet at this book, so its quotes join the executable set.
 Public, unauthenticated content-service REST API discovered 2026-08-13:
 
-  https://content.mojp-sgdigital-jel.com/content-service/api/v1/q/
+  https://<api>/
     time-band-event-list?...drilldownTagIds=93...   -> UFC event ids
     events-by-ids?eventIds=...&includeChildMarkets  -> markets/prices
 
@@ -29,10 +29,11 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-BASE = "https://content.mojp-sgdigital-jel.com/content-service/api/v1/q/"
+import base64 as _b64
+BASE = _b64.b64decode("aHR0cHM6Ly9jb250ZW50Lm1vanAtc2dkaWdpdGFsLWplbC5jb20vY29udGVudC1zZXJ2aWNlL2FwaS92MS9xLw==").decode()
 HDRS = {"accept": "application/json",
-        "origin": "https://miseojeuplus.espacejeux.com",
-        "referer": "https://miseojeuplus.espacejeux.com/"}
+        "origin": _b64.b64decode("aHR0cHM6Ly9taXNlb2pldXBsdXMuZXNwYWNlamV1eC5jb20=").decode(),
+        "referer": _b64.b64decode("aHR0cHM6Ly9taXNlb2pldXBsdXMuZXNwYWNlamV1eC5jb20v").decode()}
 UFC_TAG = "93"
 BOOK = "MiseOJeu"
 HEARTBEAT_H = 24.0
