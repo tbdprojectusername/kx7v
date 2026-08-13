@@ -1,7 +1,5 @@
 {
- "poll_time": "2026-08-13T18:59:04.564238+00:00",
- "status": "complete",
- "fights": 19,
- "rows_written": 19,
- "quarantined": 0
+ "poll_time": "2026-08-13T19:04:32.126561+00:00",
+ "status": "aborted",
+ "error": "HTTP 403 on time-band-event-list?maxMarkets=10&excludeEventsWithNoMarket"
 }
