@@ -1,0 +1,5 @@
+# Append-only capture CSVs: two workflow runs appending different rows to the same
+# monthly file must never textually conflict on rebase — union keeps both sides.
+# (2026-08-13: a queued fightodds run raced the prior run's final push and died
+# mid-rebase; consumers already dedupe on read, so union is safe here.)
+data/*.csv merge=union
