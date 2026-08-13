@@ -1,0 +1,77 @@
+name: fightodds
+
+# SHADOW-ONLY FightOdds capture (design: private repo CLAUDE_HANDOFF_FIGHTODDS_CAPTURE.md).
+# Current UFC/DWCS moneylines from api.fightodds.io — one polite pass per run
+# (~22 requests at >=1s spacing). Manual canaries first; the hourly cron is
+# enabled only after they pass from GitHub runner IPs. Runs ONCE per hour,
+# never inside the 5 BFO sub-polls.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "canary-discovery | canary-event | cycle"
+        required: true
+        default: canary-discovery
+        type: choice
+        options: [canary-discovery, canary-event, cycle]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fightodds
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Offline parser tests
+        run: python test_poll_fightodds.py
+
+      - name: Run poller
+        run: |
+          MODE="${{ github.event.inputs.mode || 'cycle' }}"
+          echo "mode: $MODE"
+          set +e
+          case "$MODE" in
+            canary-discovery) python poll_fightodds.py --canary discovery ;;
+            canary-event)     python poll_fightodds.py --canary event ;;
+            cycle)            python poll_fightodds.py --out-dir data ;;
+          esac
+          rc=$?
+          set -e
+          # rc=2 is a deliberate abort (429/403/challenge): nothing was published,
+          # the manifest says so — warn, don't page. Anything else non-zero is a bug.
+          if [ "$rc" -eq 2 ]; then
+            echo "::warning::fightodds cycle aborted (rate-limited or blocked) — no rows published"
+          elif [ "$rc" -ne 0 ]; then
+            exit "$rc"
+          fi
+
+      - name: Commit rows
+        if: ${{ (github.event.inputs.mode || 'cycle') == 'cycle' }}
+        run: |
+          git config user.name  "odds-capture-bot"
+          git config user.email "actions@github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "no new rows"
+            exit 0
+          fi
+          git commit -m "fightodds: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          OK=0
+          for a in 1 2 3; do
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && \
+            git push origin "HEAD:${GITHUB_REF_NAME}" && OK=1 && break
+            echo "push attempt $a failed, retrying"; sleep 5
+          done
+          [ "$OK" -eq 1 ] || { echo "::error::push failed after 3 attempts"; exit 1; }
