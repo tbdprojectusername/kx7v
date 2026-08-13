@@ -1,11 +1,14 @@
 name: fightodds
 
-# SHADOW-ONLY FightOdds capture (design: private repo CLAUDE_HANDOFF_FIGHTODDS_CAPTURE.md).
-# Current UFC/DWCS moneylines from api.fightodds.io — one polite pass per run
-# (~22 requests at >=1s spacing). GitHub-IP canaries passed 2026-08-13
-# (discovery 200/1.2s; UFC 330 = 326 quotes/29 books; full cycle 20/20 events,
-# 530 rows, 0 failures). Hourly at :30 — offset from the :00 BFO poll job so
-# their commits never race; never inside the 5 BFO sub-polls.
+# FightOdds capture (design: private repo CLAUDE_HANDOFF_FIGHTODDS_CAPTURE.md +
+# FIGHTODDS_LIVE_ROLLOUT_2026-08-13.md). Current UFC/DWCS moneylines from
+# api.fightodds.io. GitHub cron is throttled hard, so like the BFO job this
+# runs HOURLY with an internal loop: 6 polls ~10 min apart, committing after
+# each so data lands even if a later poll (or the runner) dies. ~22 requests
+# per poll at >=1s spacing = ~0.04 req/s average, ~40x under the calibrated
+# limit (canaries passed from runner IPs 2026-08-13: 20/20 events, 0 fails).
+# A 429/403 aborts that poll (rc=2, nothing published) and we wait for the
+# next slot. Cadence rollback = drop the loop back to a single poll.
 on:
   schedule:
     - cron: "30 * * * *"
@@ -14,7 +17,7 @@ on:
       mode:
         description: "canary-discovery | canary-event | cycle"
         required: true
-        default: canary-discovery
+        default: cycle
         type: choice
         options: [canary-discovery, canary-event, cycle]
 
@@ -28,7 +31,7 @@ concurrency:
 jobs:
   poll:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 58
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -40,41 +43,47 @@ jobs:
       - name: Offline parser tests
         run: python test_poll_fightodds.py
 
-      - name: Run poller
+      - name: Poll loop
         run: |
           MODE="${{ github.event.inputs.mode || 'cycle' }}"
           echo "mode: $MODE"
-          set +e
-          case "$MODE" in
-            canary-discovery) python poll_fightodds.py --canary discovery ;;
-            canary-event)     python poll_fightodds.py --canary event ;;
-            cycle)            python poll_fightodds.py --out-dir data ;;
-          esac
-          rc=$?
-          set -e
-          # rc=2 is a deliberate abort (429/403/challenge): nothing was published,
-          # the manifest says so — warn, don't page. Anything else non-zero is a bug.
-          if [ "$rc" -eq 2 ]; then
-            echo "::warning::fightodds cycle aborted (rate-limited or blocked) — no rows published"
-          elif [ "$rc" -ne 0 ]; then
-            exit "$rc"
+          if [ "$MODE" != "cycle" ]; then
+            case "$MODE" in
+              canary-discovery) python poll_fightodds.py --canary discovery ;;
+              canary-event)     python poll_fightodds.py --canary event ;;
+            esac
+            exit $?
           fi
-
-      - name: Commit rows
-        if: ${{ (github.event.inputs.mode || 'cycle') == 'cycle' }}
-        run: |
           git config user.name  "odds-capture-bot"
           git config user.email "actions@github.com"
-          git add data
-          if git diff --cached --quiet; then
-            echo "no new rows"
-            exit 0
-          fi
-          git commit -m "fightodds: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          OK=0
-          for a in 1 2 3; do
-            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && \
-            git push origin "HEAD:${GITHUB_REF_NAME}" && OK=1 && break
-            echo "push attempt $a failed, retrying"; sleep 5
+          PUSH_FAIL=0
+          for i in 1 2 3 4 5 6; do
+            echo "=== fightodds poll $i of 6 ==="
+            set +e
+            python poll_fightodds.py --out-dir data
+            rc=$?
+            set -e
+            if [ "$rc" -eq 2 ]; then
+              echo "::warning::poll $i aborted (rate-limited or blocked) — nothing published"
+            elif [ "$rc" -ne 0 ]; then
+              exit "$rc"
+            fi
+            git add data
+            if ! git diff --cached --quiet; then
+              git commit -m "fightodds: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              OK=0
+              for a in 1 2 3; do
+                git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && \
+                git push origin "HEAD:${GITHUB_REF_NAME}" && OK=1 && break
+                echo "push attempt $a failed, retrying"; sleep 5
+              done
+              # $GITHUB_ENV only reaches later steps — same-step test needs the shell var
+              if [ "$OK" -ne 1 ]; then
+                PUSH_FAIL=1
+              fi
+            else
+              echo "no new rows on poll $i"
+            fi
+            [ "$i" -lt 6 ] && sleep 540
           done
-          [ "$OK" -eq 1 ] || { echo "::error::push failed after 3 attempts"; exit 1; }
+          [ "$PUSH_FAIL" -eq 0 ] || { echo "::error::a poll commit failed to push"; exit 1; }
