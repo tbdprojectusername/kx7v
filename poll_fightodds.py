@@ -369,7 +369,9 @@ def parse_event(data: dict, ev: dict, poll_iso: str):
 def write_rows(rows: list[dict], out_dir, status: str):
     """Change-detected append to the monthly CSV; returns (path, rows_written).
 
-    Rows the flip guard marked are routed to a QUARANTINE SIDECAR rather than
+    Rows the flip guard marked are routed to a QUARANTINE SIDECAR
+    (`quarantine_fightodds_YYYY-MM.csv`, deliberately outside the `fightodds_`
+    namespace so no consumer can read it as production data) rather than
     deleted. The main file keeps its exact schema, and a dropped quote stays
     recoverable and countable — deleting them made the guard's own misfires
     invisible (it was silently discarding four honest books at once from a 51/49
@@ -377,7 +379,11 @@ def write_rows(rows: list[dict], out_dir, status: str):
     """
     now = pd.Timestamp.now(tz="UTC")
     path = Path(out_dir) / f"fightodds_{now:%Y-%m}.csv"
-    qpath = Path(out_dir) / f"fightodds_quarantine_{now:%Y-%m}.csv"
+    # NOT "fightodds_*": every private consumer selected capture files by feed
+    # prefix, so a sidecar in that namespace would have been synced as one of the
+    # two most recent monthly files and concatenated straight back into live
+    # pricing. The prefix no feed starts with is the only safe place for it.
+    qpath = Path(out_dir) / f"quarantine_fightodds_{now:%Y-%m}.csv"
     held = [r for r in rows if r.get("quarantine_reason")]
     rows = [r for r in rows if not r.get("quarantine_reason")]
     if held:

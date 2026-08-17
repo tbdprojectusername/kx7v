@@ -260,7 +260,7 @@ class FlipGuardTests(unittest.TestCase):
             self.assertNotIn("Bet105", set(main.book))
             self.assertNotIn("quarantine_reason", main.columns,
                              "main-file schema must not change")
-            side = next(Path(td).glob("fightodds_quarantine_*.csv"))
+            side = next(Path(td).glob("quarantine_fightodds_*.csv"))
             q = pd.read_csv(side)
             self.assertEqual(list(q.book), ["Bet105"])
             self.assertEqual(list(q.cycle_status), ["complete"])
