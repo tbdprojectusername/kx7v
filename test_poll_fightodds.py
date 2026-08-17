@@ -183,21 +183,31 @@ class WriteTests(unittest.TestCase):
 
 
 class FlipGuardTests(unittest.TestCase):
-    """A source-mislabelled book (outcomes transposed) must be quarantined by the field."""
+    """A source-mislabelled book (outcomes transposed) is MARKED, never dropped.
+
+    Deletion is what made the guard's own misfires invisible: before the
+    identifiability floor (2026-08-16) it was silently discarding four honest
+    books at once from a 51/49 fight. Marked rows go to a quarantine sidecar.
+    """
 
     def fight_with(self, prices):
         offers = [offer(bk, [outcome("israel-adesanya", a), outcome("jan-blachowicz", b)])
                   for bk, (a, b) in prices.items()]
         return payload([fight("f-1", ADESANYA, BLACHOWICZ, offers)])
 
-    def test_flipped_book_quarantined_when_field_disagrees(self):
+    def held(self, rows):
+        return {r["book"] for r in rows if r.get("quarantine_reason")}
+
+    def test_flipped_book_is_marked_not_dropped(self):
         rows, quar = parse_event(self.fight_with({
             "BetOnline": (-450, 350), "Pinnacle": (-444, 350), "Stake": (-455, 340),
             "Bet105": (350, -444),          # transposed at the source
         }), EV, POLL)
         self.assertEqual(quar, 1)
-        self.assertNotIn("Bet105", {r["book"] for r in rows})
-        self.assertEqual(len(rows), 3)
+        self.assertEqual(len(rows), 4, "the row must survive parsing")
+        self.assertEqual(self.held(rows), {"Bet105"})
+        self.assertIn("transposed", next(r["quarantine_reason"] for r in rows
+                                         if r["book"] == "Bet105"))
 
     def test_genuine_disagreement_survives(self):
         # real price dispersion on a near-pick'em must NOT trip the guard
@@ -205,12 +215,56 @@ class FlipGuardTests(unittest.TestCase):
             "BetOnline": (-120, 100), "Pinnacle": (-110, -110), "Stake": (100, -120),
         }), EV, POLL)
         self.assertEqual((len(rows), quar), (3, 0))
+        self.assertEqual(self.held(rows), set())
+
+    def test_pickem_field_is_never_judged(self):
+        """A 51/49 fight cannot distinguish the median from its mirror.
+
+        Four books at once were being discarded from padilla|haqparast on
+        2026-08-16 — a transposed majority would BE the field, so this can only
+        ever be a misfire.
+        """
+        rows, quar = parse_event(self.fight_with({
+            "BetOnline": (-104, -108), "Pinnacle": (-106, -106), "Stake": (-112, -100),
+            "Bet105": (-102, -114), "Bookmaker": (100, -120),
+        }), EV, POLL)
+        self.assertEqual((len(rows), quar), (5, 0))
+        self.assertEqual(self.held(rows), set())
+
+    def test_outlier_that_is_not_an_exact_mirror_survives(self):
+        """Crossing the midpoint is not enough; a transpose lands ON the mirror."""
+        rows, quar = parse_event(self.fight_with({
+            "BetOnline": (-160, 140), "Pinnacle": (-155, 138), "Stake": (-165, 145),
+            "Bet105": (330, -400),      # far past the mirror -> not a swap of this field
+        }), EV, POLL)
+        self.assertEqual(quar, 0)
+        self.assertEqual(self.held(rows), set())
 
     def test_no_guard_below_three_books(self):
         rows, quar = parse_event(self.fight_with({
             "BetOnline": (-450, 350), "Bet105": (350, -444),
         }), EV, POLL)
         self.assertEqual((len(rows), quar), (2, 0))
+        self.assertEqual(self.held(rows), set())
+
+    def test_quarantined_rows_route_to_the_sidecar_not_the_main_file(self):
+        import tempfile
+        rows, quar = parse_event(self.fight_with({
+            "BetOnline": (-450, 350), "Pinnacle": (-444, 350), "Stake": (-455, 340),
+            "Bet105": (350, -444),
+        }), EV, POLL)
+        with tempfile.TemporaryDirectory() as td:
+            path, n = write_rows(rows, td, "complete")
+            self.assertEqual(n, 3, "a quarantined row reached the main file")
+            main = pd.read_csv(path)
+            self.assertNotIn("Bet105", set(main.book))
+            self.assertNotIn("quarantine_reason", main.columns,
+                             "main-file schema must not change")
+            side = next(Path(td).glob("fightodds_quarantine_*.csv"))
+            q = pd.read_csv(side)
+            self.assertEqual(list(q.book), ["Bet105"])
+            self.assertEqual(list(q.cycle_status), ["complete"])
+            self.assertTrue(q.quarantine_reason.str.contains("transposed").all())
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

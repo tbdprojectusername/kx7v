@@ -58,6 +58,14 @@ EXCHANGES = {"novig", "prophetx", "prophet x", "prophet exchange", "polymarket",
 OVERROUND_LO, OVERROUND_HI = 0.90, 1.35
 FLIP_MARGIN = 0.02   # mirror test must beat the direct fit by this much to call a flip
 FLIP_MIN_BOOKS = 3
+# A transpose is only identifiable when the field median and its mirror are far
+# enough apart to tell apart, and a real transpose lands ~exactly on the mirror.
+# Measured 2026-08-16 on 9,389 captured quotes: honest cross-book disagreement is
+# 0.4pp median / 4.4pp p99 / 7.5pp p99.9, so on a near-even fight ordinary
+# disagreement crosses the midpoint and reads as "transposed". Four books at once
+# were being dropped from a 51/49 fight (padilla|haqparast, 2026-08-16).
+FLIP_MIN_SEPARATION = 0.10   # |2*median - 1|
+FLIP_MIRROR_TOL = 0.05       # ||q - median| - separation|
 HEARTBEAT_H = 24.0
 MIN_INTERVAL = 1.0  # seconds between request starts, global (single worker)
 
@@ -332,25 +340,51 @@ def parse_event(data: dict, ev: dict, poll_iso: str):
             srt = sorted(qs)
             med = srt[len(srt) // 2] if len(srt) % 2 else (srt[len(srt) // 2 - 1] + srt[len(srt) // 2]) / 2
             kept = []
+            sep = abs(2 * med - 1)
             for r_, q_ in zip(fight_rows, qs):
-                # mirror test: is this row closer to the field's TRANSPOSE than to the
-                # field? A fixed gap misses near-pick'ems (flipping a -140 favourite
-                # moves the probability only ~16pp) yet those rows still fabricate arbs.
-                if abs(q_ - (1 - med)) + FLIP_MARGIN < abs(q_ - med):
+                # Three conditions, all required. (1) mirror test: is this row
+                # closer to the field's TRANSPOSE than to the field? A fixed gap
+                # misses near-pick'ems (flipping a -140 favourite moves the
+                # probability only ~16pp) yet those rows still fabricate arbs.
+                # (2) identifiable: the median and its mirror are `sep` apart, and
+                # that collapses to zero on a coinflip, where honest disagreement
+                # crosses the midpoint constantly. (3) signature: a real transpose
+                # is an exact swap, so its distance from the field equals `sep`.
+                d_ = abs(q_ - med)
+                if (abs(q_ - (1 - med)) + FLIP_MARGIN < d_
+                        and sep >= FLIP_MIN_SEPARATION
+                        and abs(d_ - sep) <= FLIP_MIRROR_TOL):
                     print(f"  FLIP quarantine: {r_['book']} on {r_['fight_slug']} "
-                          f"(q={q_:.2f} vs field {med:.2f})", flush=True)
+                          f"(q={q_:.2f} vs field {med:.2f}, sep={sep:.2f})", flush=True)
+                    r_["quarantine_reason"] = (f"transposed: q={q_:.4f} mirrors field "
+                                               f"median {med:.4f} (sep {sep:.4f}, "
+                                               f"{len(qs)} books)")
                     quar += 1
-                else:
-                    kept.append(r_)
+                kept.append(r_)   # marked, never dropped — write_rows routes it
             fight_rows = kept
         rows.extend(fight_rows)
     return rows, quar
 
 
 def write_rows(rows: list[dict], out_dir, status: str):
-    """Change-detected append to the monthly CSV; returns (path, rows_written)."""
+    """Change-detected append to the monthly CSV; returns (path, rows_written).
+
+    Rows the flip guard marked are routed to a QUARANTINE SIDECAR rather than
+    deleted. The main file keeps its exact schema, and a dropped quote stays
+    recoverable and countable — deleting them made the guard's own misfires
+    invisible (it was silently discarding four honest books at once from a 51/49
+    fight before the identifiability floor landed on 2026-08-16).
+    """
     now = pd.Timestamp.now(tz="UTC")
     path = Path(out_dir) / f"fightodds_{now:%Y-%m}.csv"
+    qpath = Path(out_dir) / f"fightodds_quarantine_{now:%Y-%m}.csv"
+    held = [r for r in rows if r.get("quarantine_reason")]
+    rows = [r for r in rows if not r.get("quarantine_reason")]
+    if held:
+        for r in held:
+            r["cycle_status"] = status
+        Path(out_dir).mkdir(exist_ok=True)
+        pd.DataFrame(held).to_csv(qpath, mode="a", header=not qpath.exists(), index=False)
     prev_latest = {}
     if path.exists():
         try:
