@@ -1,6 +1,6 @@
 {
- "poll_time": "2026-08-18T17:58:51.063115+00:00",
- "status": "complete",
+ "poll_time": "2026-08-18T18:08:23.828231+00:00",
+ "status": "partial",
  "requested_pks": [
   9112,
   9656,
@@ -40,13 +40,14 @@
   9106,
   9743,
   9105,
-  9736,
   9104,
   9724,
   9733,
   9758,
   9757
  ],
- "failed_pks": [],
- "rows_written": 17
+ "failed_pks": [
+  9736
+ ],
+ "rows_written": 26
 }
