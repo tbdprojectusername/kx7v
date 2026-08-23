@@ -1,0 +1,70 @@
+name: sync-fightodds-props
+
+on:
+  schedule:
+    - cron: "15 * * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "canary | cycle"
+        required: true
+        default: cycle
+        type: choice
+        options: [canary, cycle]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fightodds-props
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 58
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python test_poll_fightodds_props.py
+
+      - name: Poll current prematch props
+        run: |
+          MODE="${{ github.event.inputs.mode || 'cycle' }}"
+          if [ "$MODE" = "canary" ]; then
+            python poll_fightodds_props.py --canary
+            exit $?
+          fi
+          git config user.name "odds-capture-bot"
+          git config user.email "actions@github.com"
+          PUSH_FAIL=0
+          for i in 1 2 3 4 5 6; do
+            echo "=== prop poll $i of 6 ==="
+            set +e
+            python poll_fightodds_props.py --out-dir data --days 7
+            rc=$?
+            set -e
+            if [ "$rc" -eq 2 ]; then
+              echo "::warning::prop poll $i aborted — nothing published"
+            elif [ "$rc" -ne 0 ]; then
+              exit "$rc"
+            fi
+            git add data/fightodds_props_*.csv data/fightodds_props_cycle_latest.json
+            if ! git diff --cached --quiet; then
+              git commit -m "sync props: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              OK=0
+              for attempt in 1 2 3; do
+                git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && \
+                git push origin "HEAD:${GITHUB_REF_NAME}" && OK=1 && break
+                git rebase --abort >/dev/null 2>&1 || true
+                sleep 5
+              done
+              [ "$OK" -eq 1 ] || PUSH_FAIL=1
+            fi
+            [ "$i" -lt 6 ] && sleep 540
+          done
+          [ "$PUSH_FAIL" -eq 0 ] || exit 1
