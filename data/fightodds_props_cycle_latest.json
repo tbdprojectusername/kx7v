@@ -2,18 +2,18 @@
   "contract": "FIGHTODDS-PROPS-CURRENT-SNAPSHOT-1",
   "failed_pks": [],
   "invalid_outcomes": 0,
-  "observed_outcomes": 1284,
-  "poll_time": "2026-08-24T20:48:10.552134+00:00",
+  "observed_outcomes": 1296,
+  "poll_time": "2026-08-24T20:54:56.095568+00:00",
   "requested_pks": [
     9111,
     8869
   ],
-  "rows_written": 39,
+  "rows_written": 123,
   "snapshot": {
-    "bytes": 537123,
+    "bytes": 542076,
     "path": "fightodds_props_snapshot_latest.csv",
-    "rows": 1284,
-    "sha256": "43c7eb2d38494657a8467638df8fa452f6aa92fc197a5297bc10d1e803b14b34"
+    "rows": 1296,
+    "sha256": "e4478d574d476e2750de96850eada167b053f2d9fb610b8c899ef15a26d9a4ae"
   },
   "status": "complete",
   "succeeded_pks": [
