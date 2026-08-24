@@ -33,17 +33,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 58
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
 
       - name: Offline parser tests
-        run: python test_poll_fightodds.py
+        run: |
+          python test_poll_fightodds.py
+          python test_poll_fightodds_props.py
+          python test_snapshot_io.py
 
       - name: Poll loop
+        env:
+          PRIVATE_REPO_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
         run: |
           MODE="${{ github.event.inputs.mode || 'cycle' }}"
           echo "mode: $MODE"
@@ -68,6 +73,16 @@ jobs:
               echo "::warning::poll $i aborted — nothing published"
             elif [ "$rc" -ne 0 ]; then
               exit "$rc"
+            else
+              set +e
+              python poll_fightodds_props.py --out-dir data --days 7
+              prop_rc=$?
+              set -e
+              if [ "$prop_rc" -eq 2 ]; then
+                echo "::warning::prop poll $i aborted — moneylines remain valid"
+              elif [ "$prop_rc" -ne 0 ]; then
+                exit "$prop_rc"
+              fi
             fi
             git add data
             if ! git diff --cached --quiet; then
@@ -82,6 +97,15 @@ jobs:
               # $GITHUB_ENV only reaches later steps — same-step test needs the shell var
               if [ "$OK" -ne 1 ]; then
                 PUSH_FAIL=1
+              elif [ -n "$PRIVATE_REPO_TOKEN" ]; then
+                REVISION=$(git rev-parse HEAD)
+                curl --fail --silent --show-error \
+                  -X POST \
+                  -H "Authorization: Bearer $PRIVATE_REPO_TOKEN" \
+                  -H "Accept: application/vnd.github+json" \
+                  https://api.github.com/repos/tbdprojectusername/odds-capture/dispatches \
+                  -d "{\"event_type\":\"odds-capture-updated\",\"client_payload\":{\"revision\":\"$REVISION\"}}" \
+                  || echo "::warning::private hot-state dispatch failed; cron fallback remains"
               fi
             else
               echo "no new rows on poll $i"

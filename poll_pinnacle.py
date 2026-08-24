@@ -22,8 +22,10 @@ import csv
 import datetime as dt
 import os
 import time
+from pathlib import Path
 
 import requests
+from snapshot_io import atomic_csv, atomic_json
 
 import base64 as _b64
 BASE_URL = _b64.b64decode("aHR0cHM6Ly9ndWVzdC5hcGkuYXJjYWRpYS5waW5uYWNsZS5jb20vMC4x").decode()
@@ -98,8 +100,15 @@ def main() -> int:
 
     poll = dt.datetime.now(dt.timezone.utc).isoformat()
     c = Client()
-    matchups = c.get(f"/leagues/{a.league}/matchups")
-    markets = c.get(f"/leagues/{a.league}/markets/straight")
+    try:
+        matchups = c.get(f"/leagues/{a.league}/matchups")
+        markets = c.get(f"/leagues/{a.league}/markets/straight")
+    except Exception as exc:
+        atomic_json(Path(a.out_dir) / "pinnacle_cycle_latest.json", {
+            "contract": "PINNACLE-CURRENT-SNAPSHOT-1",
+            "poll_time": poll, "status": "aborted", "reason": repr(exc),
+        })
+        raise
     games = games_index(matchups)
 
     rows = []
@@ -131,6 +140,16 @@ def main() -> int:
                 "max_risk": max_risk, "currency_hint": "account_ccy",
                 "cutoff_at": mkt.get("cutoffAt"), "version": mkt.get("version"),
             })
+
+    snapshot = atomic_csv(
+        Path(a.out_dir) / "pinnacle_snapshot_latest.csv", rows, FIELDS
+    )
+    atomic_json(Path(a.out_dir) / "pinnacle_cycle_latest.json", {
+        "contract": "PINNACLE-CURRENT-SNAPSHOT-1",
+        "poll_time": poll, "status": "complete", "league_id": a.league,
+        "matchups_received": len(matchups), "markets_received": len(markets),
+        "snapshot": snapshot,
+    })
 
     if not rows:
         log(f"poll {poll}: no UFC game lines on the board (no open cards)")

@@ -1,8 +1,8 @@
 name: sync-fightodds-props
 
 on:
-  schedule:
-    - cron: "15 * * * *"
+  # Manual diagnostic only. Scheduled prop polling is serialized inside
+  # fightodds.yml so moneylines and props share the source request budget.
   workflow_dispatch:
     inputs:
       mode:
@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: fightodds-props
+  group: fightodds
   cancel-in-progress: false
 
 jobs:

@@ -44,6 +44,7 @@ from pathlib import Path
 
 import pandas as pd
 from curl_cffi import requests as creq
+from snapshot_io import atomic_csv, atomic_json
 
 import base64 as _b64
 GQL = _b64.b64decode("aHR0cHM6Ly9hcGkuZmlnaHRvZGRzLmlvL2dxbA==").decode()
@@ -68,6 +69,14 @@ FLIP_MIN_SEPARATION = 0.10   # |2*median - 1|
 FLIP_MIRROR_TOL = 0.05       # ||q - median| - separation|
 HEARTBEAT_H = 24.0
 MIN_INTERVAL = 1.0  # seconds between request starts, global (single worker)
+HISTORY_FIELDS = [
+    "poll_time", "event_pk", "pair", "fight_slug", "event_date", "event_name",
+    "promotion", "side1_key", "side2_key", "book", "book_role", "dec1", "dec2",
+    "amer1", "amer2", "source_offer_ts", "source_change_age_h", "cycle_status",
+]
+SNAPSHOT_FIELDS = [
+    *HISTORY_FIELDS, "offer_id", "offer_category", "offer_status", "disabled",
+]
 
 EVENTS_Q = """
 query EventsQuery($first: Int, $after: String, $dateGte: Date, $dateLt: Date, $orderBy: String) {
@@ -92,6 +101,9 @@ query CurrentMoneylines($pk: Int) {
           edges { node {
             id
             timestamp
+            status
+            disabled
+            offerType { category }
             sportsbook { shortName slug }
             outcomes { edges { node {
               id name fighter { slug } odds oddsOpen
@@ -286,6 +298,12 @@ def parse_event(data: dict, ev: dict, poll_iso: str):
         fight_rows = []
         for oe in oconn.get("edges") or []:
             o = oe.get("node") or {}
+            offer_category = str((o.get("offerType") or {}).get("category") or "")
+            offer_status = str(o.get("status") or "")
+            disabled = bool(o.get("disabled"))
+            if offer_category != "A_1" or disabled or offer_status.upper() not in {"O", "OPEN"}:
+                quar += 1
+                continue
             sb = o.get("sportsbook") or {}
             book = str(sb.get("shortName") or sb.get("slug") or "").strip()
             if not book or book.lower() in EXCLUDED_BOOKS:
@@ -323,6 +341,10 @@ def parse_event(data: dict, ev: dict, poll_iso: str):
                 "amer1": _fmt_amer(a1), "amer2": _fmt_amer(a2),
                 "source_offer_ts": src_ts,
                 "source_change_age_h": _age_h(poll_iso, src_ts) if src_ts else "",
+                "offer_id": str(o.get("id") or ""),
+                "offer_category": offer_category,
+                "offer_status": offer_status,
+                "disabled": 1 if disabled else 0,
                 "cycle_status": "",  # stamped at write time
             })
         # Cross-book flip guard. A book whose implied side1 probability sits on the
@@ -390,7 +412,11 @@ def write_rows(rows: list[dict], out_dir, status: str):
         for r in held:
             r["cycle_status"] = status
         Path(out_dir).mkdir(exist_ok=True)
-        pd.DataFrame(held).to_csv(qpath, mode="a", header=not qpath.exists(), index=False)
+        pd.DataFrame([
+            {**{key: row.get(key, "") for key in HISTORY_FIELDS},
+             "quarantine_reason": row.get("quarantine_reason", "")}
+            for row in held
+        ]).to_csv(qpath, mode="a", header=not qpath.exists(), index=False)
     prev_latest = {}
     if path.exists():
         try:
@@ -415,17 +441,38 @@ def write_rows(rows: list[dict], out_dir, status: str):
         r["cycle_status"] = status
     if keep:
         Path(out_dir).mkdir(exist_ok=True)
-        pd.DataFrame(keep).to_csv(path, mode="a", header=not path.exists(), index=False)
+        pd.DataFrame([
+            {key: row.get(key, "") for key in HISTORY_FIELDS} for row in keep
+        ]).to_csv(path, mode="a", header=not path.exists(), index=False)
     return path, len(keep)
 
 
-def write_manifest(out_dir, poll_iso, requested, succeeded, failed, rows_written, status):
+def write_snapshot(rows: list[dict], out_dir: str, poll_iso: str, status: str) -> dict:
+    """Atomic proof of which clean A_1 offers were active in this exact cycle."""
+    accepted = []
+    for row in rows:
+        if row.get("quarantine_reason"):
+            continue
+        item = dict(row)
+        item["cycle_status"] = status
+        accepted.append(item)
+    return atomic_csv(
+        Path(out_dir) / "fightodds_snapshot_latest.csv",
+        accepted,
+        SNAPSHOT_FIELDS,
+    )
+
+
+def write_manifest(out_dir, poll_iso, requested, succeeded, failed, rows_written, status,
+                   snapshot=None):
     """Per-cycle health record — the authoritative freshness/liveness signal."""
     Path(out_dir).mkdir(exist_ok=True)
-    (Path(out_dir) / "fightodds_cycle_latest.json").write_text(json.dumps({
+    atomic_json(Path(out_dir) / "fightodds_cycle_latest.json", {
+        "contract": "FIGHTODDS-CURRENT-SNAPSHOT-1",
         "poll_time": poll_iso, "status": status, "requested_pks": requested,
         "succeeded_pks": succeeded, "failed_pks": failed,
-        "rows_written": rows_written}, indent=1))
+        "rows_written": rows_written, "snapshot": snapshot,
+    })
 
 
 def main() -> int:
@@ -499,7 +546,8 @@ def main() -> int:
 
     status = "complete" if not failed else "partial"
     path, n = write_rows(rows, a.out_dir, status)
-    write_manifest(a.out_dir, poll_iso, requested, succeeded, failed, n, status)
+    snapshot = write_snapshot(rows, a.out_dir, poll_iso, status)
+    write_manifest(a.out_dir, poll_iso, requested, succeeded, failed, n, status, snapshot)
     print(f"cycle {status}: {len(rows)} quotes observed, {n} rows appended -> {path.name}; "
           f"{total_quar} quarantined; failed pks: {failed or 'none'}", flush=True)
     return 0

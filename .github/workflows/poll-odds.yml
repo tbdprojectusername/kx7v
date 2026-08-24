@@ -24,17 +24,30 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
+      - run: python test_snapshot_io.py
 
       - name: Poll loop
+        env:
+          PRIVATE_REPO_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
         run: |
           git config user.name  "odds-capture-bot"
           git config user.email "actions@github.com"
           git config merge.keepmine.driver "true"
           PUSH_FAIL=0
+          BFO_OK=0
+          PIN_OK=0
           for i in 1 2 3 4 5; do
             echo "=== poll $i of 5 ==="
-            python poll_bfo.py --out-dir data || echo "BFO_FAILED=1" >> "$GITHUB_ENV"
-            python poll_pinnacle.py --out-dir data || echo "PIN_FAILED=1" >> "$GITHUB_ENV"
+            if python poll_bfo.py --out-dir data; then
+              BFO_OK=1
+            else
+              echo "BFO_FAILED=1" >> "$GITHUB_ENV"
+            fi
+            if python poll_pinnacle.py --out-dir data; then
+              PIN_OK=1
+            else
+              echo "PIN_FAILED=1" >> "$GITHUB_ENV"
+            fi
             git add data
             if ! git diff --cached --quiet; then
               git commit -m "sync: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -49,6 +62,15 @@ jobs:
               if [ "$OK" -ne 1 ]; then
                 PUSH_FAIL=1
                 echo "PUSH_FAIL=1" >> "$GITHUB_ENV"
+              elif [ -n "$PRIVATE_REPO_TOKEN" ]; then
+                REVISION=$(git rev-parse HEAD)
+                curl --fail --silent --show-error \
+                  -X POST \
+                  -H "Authorization: Bearer $PRIVATE_REPO_TOKEN" \
+                  -H "Accept: application/vnd.github+json" \
+                  https://api.github.com/repos/tbdprojectusername/odds-capture/dispatches \
+                  -d "{\"event_type\":\"odds-capture-updated\",\"client_payload\":{\"revision\":\"$REVISION\"}}" \
+                  || echo "::warning::private hot-state dispatch failed; cron fallback remains"
               fi
             else
               echo "no new rows on poll $i"
@@ -56,6 +78,8 @@ jobs:
             [ "$i" -lt 5 ] && sleep 600
           done
           [ "$PUSH_FAIL" -eq 0 ] || { echo "::error::a poll commit failed to push"; exit 1; }
+          [ "$BFO_OK" -eq 1 ] || { echo "::error::BFO had no successful poll in this run"; exit 1; }
+          [ "$PIN_OK" -eq 1 ] || { echo "::error::Pinnacle had no successful poll in this run"; exit 1; }
 
       - name: Flag scraper failures
         if: env.BFO_FAILED == '1' || env.PIN_FAILED == '1'

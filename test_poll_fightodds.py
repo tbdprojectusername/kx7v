@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from poll_fightodds import EventFailed, parse_event, write_rows
+from poll_fightodds import EventFailed, parse_event, write_rows, write_snapshot
 
 EV = {"pk": 999, "name": "UFC Test", "date": "2026-09-19", "promotion": "ufc"}
 POLL = "2026-08-12T21:00:00+00:00"
@@ -23,8 +23,9 @@ def outcome(slug, odds):
                      "odds": odds, "oddsOpen": odds}}
 
 
-def offer(book, outcomes, ts="1754947200000"):
-    return {"node": {"id": "o", "timestamp": ts,
+def offer(book, outcomes, ts="1754947200000", category="A_1", status="O", disabled=False):
+    return {"node": {"id": "o", "timestamp": ts, "status": status,
+                     "disabled": disabled, "offerType": {"category": category},
                      "sportsbook": {"shortName": book, "slug": book.lower()},
                      "outcomes": {"edges": outcomes}}}
 
@@ -155,6 +156,12 @@ class ParseTests(unittest.TestCase):
                                   ts="1754947200000")])
         self.assertTrue(rows[0]["source_offer_ts"].startswith("2025-08-11T2"))
 
+    def test_nonprematch_or_inactive_offer_is_quarantined(self):
+        outcomes = [outcome("israel-adesanya", -180), outcome("jan-blachowicz", 150)]
+        for kwargs in ({"category": "A_2"}, {"status": "C"}, {"disabled": True}):
+            rows, quar = self.one([offer("BetOnline", outcomes, **kwargs)])
+            self.assertEqual((len(rows), quar), (0, 1))
+
 
 class WriteTests(unittest.TestCase):
     def row(self, dec1="1.5556", dec2="2.5000", book="BetOnline", poll=POLL):
@@ -179,6 +186,18 @@ class WriteTests(unittest.TestCase):
             df = pd.read_csv(p)
             self.assertEqual(len(df), 3)
             self.assertTrue((df.cycle_status == "complete").all())
+
+    def test_snapshot_is_full_atomic_active_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            first = self.row()
+            first.update({"offer_id": "o1", "offer_category": "A_1",
+                          "offer_status": "O", "disabled": 0})
+            meta = write_snapshot([first], td, POLL, "complete")
+            self.assertEqual(meta["rows"], 1)
+            snap = pd.read_csv(Path(td) / "fightodds_snapshot_latest.csv")
+            self.assertEqual(list(snap.offer_category), ["A_1"])
+            write_snapshot([], td, POLL, "complete")
+            self.assertEqual(len(pd.read_csv(Path(td) / "fightodds_snapshot_latest.csv")), 0)
 
 
 

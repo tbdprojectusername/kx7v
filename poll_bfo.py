@@ -29,14 +29,17 @@ import os
 import re
 import sys
 import time
+from pathlib import Path
 
 from bs4 import BeautifulSoup
 from curl_cffi import requests
+from snapshot_io import atomic_csv, atomic_json
 
 import base64 as _b64
 BASE = _b64.b64decode("aHR0cHM6Ly93d3cuYmVzdGZpZ2h0b2Rkcy5jb20=").decode()
 FIELDS = ["poll_time", "event_slug", "event_name", "matchup_id", "side",
           "selection", "row_kind", "book_id", "book", "american", "move_arrow"]
+SNAPSHOT_FIELDS = [*FIELDS, "event_date"]
 PROP_HINT = re.compile(
     r"(round|decision|draw|by (tko|ko|submission)|goes the distance|"
     r"wins by|point|over|under)", re.I)
@@ -170,6 +173,31 @@ def parse_event(html: str, slug: str) -> list[dict]:
     return out
 
 
+def publish_cycle(out_dir: str, poll: str, rows: list[dict], dates: dict[str, str],
+                  requested: list[str], succeeded: list[str], failed: list[str]) -> None:
+    """Publish the complete active board atomically; append history remains separate."""
+    enriched = [
+        {"poll_time": poll, **row, "event_date": dates.get(row["event_slug"], "")}
+        for row in rows
+    ]
+    snapshot = atomic_csv(
+        Path(out_dir) / "bfo_snapshot_latest.csv", enriched, SNAPSHOT_FIELDS
+    )
+    status = "complete" if not failed else "partial"
+    atomic_json(
+        Path(out_dir) / "bfo_cycle_latest.json",
+        {
+            "contract": "BFO-CURRENT-SNAPSHOT-1",
+            "poll_time": poll,
+            "status": status,
+            "requested_event_slugs": requested,
+            "succeeded_event_slugs": succeeded,
+            "failed_event_slugs": failed,
+            "snapshot": snapshot,
+        },
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-dir", default="data")
@@ -183,6 +211,7 @@ def main() -> int:
 
     # Event dates ride in a separate tiny CSV; failures here must never block
     # the quote capture (movement scorer uses this as its date fallback).
+    dates: dict[str, str] = {}
     try:
         dates = event_dates(home_html)
         if dates:
@@ -212,19 +241,41 @@ def main() -> int:
     targets = [h for h in links if a.only.lower() in h.lower()] if a.only else list(links)
     if not targets:
         log(f"poll {poll}: no events matched --only={a.only!r}; saw {sorted(links)}")
+        publish_cycle(a.out_dir, poll, [], dates, [], [], [])
         return 0                      # not an error: there may be no cards up
 
     rows: list[dict] = []
+    succeeded: list[str] = []
+    failed: list[str] = []
     for href in sorted(targets):
         slug = href.rstrip("/").split("/")[-1]
-        got = parse_event(get(BASE + href), slug)
-        log(f"  {slug}: {len(got)} quotes")
-        rows.extend(got)
+        try:
+            got = parse_event(get(BASE + href), slug)
+            if not got:
+                raise RuntimeError("parsed zero quotes")
+            log(f"  {slug}: {len(got)} quotes")
+            rows.extend(got)
+            succeeded.append(slug)
+        except Exception as exc:
+            failed.append(slug)
+            log(f"  FAILED {slug}: {exc!r}")
         time.sleep(1.0)               # politeness between event pages
 
     if not rows:
         log(f"poll {poll}: parsed 0 quotes — SA layout probably changed")
+        atomic_json(Path(a.out_dir) / "bfo_cycle_latest.json", {
+            "contract": "BFO-CURRENT-SNAPSHOT-1", "poll_time": poll,
+            "status": "aborted", "requested_event_slugs": [
+                href.rstrip("/").split("/")[-1] for href in sorted(targets)
+            ], "succeeded_event_slugs": succeeded, "failed_event_slugs": failed,
+        })
         return 1                      # fail loudly so the workflow surfaces it
+
+    publish_cycle(
+        a.out_dir, poll, rows, dates,
+        [href.rstrip("/").split("/")[-1] for href in sorted(targets)],
+        succeeded, failed,
+    )
 
     os.makedirs(a.out_dir, exist_ok=True)
     path = os.path.join(a.out_dir, f"bfo_{poll[:7]}.csv")
@@ -240,7 +291,7 @@ def main() -> int:
     log(f"poll {poll}: {len(rows)} quotes ({ml} moneyline), "
         f"{len({r['matchup_id'] for r in rows})} matchups, "
         f"{len({r['book'] for r in rows})} books -> {path}")
-    return 0
+    return 0 if not failed else 2
 
 
 if __name__ == "__main__":

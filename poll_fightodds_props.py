@@ -34,10 +34,19 @@ from poll_fightodds import (
     discover,
     gql,
 )
+from snapshot_io import atomic_csv, atomic_json
 
 
 EXCLUDED_CATEGORIES = {"A_1", "A_2"}
 HEARTBEAT_H = 24.0
+PROP_FIELDS = [
+    "poll_time", "event_pk", "event_date", "event_name", "promotion", "fight_slug",
+    "offer_id", "outcome_id", "book", "book_role", "type_id", "category",
+    "subcategory", "description", "not_description", "offer_value", "type_value",
+    "outcome_name", "outcome_fighter_slug", "is_not", "american", "american_open",
+    "american_best", "american_worst", "source_offer_ts", "source_created_at",
+    "source_change_age_h", "offer_status", "disabled", "cycle_status",
+]
 PROPS_Q = """
 query CurrentProps($pk: Int, $off: Int) {
   event: eventByPk(pk: $pk) {
@@ -184,9 +193,7 @@ def write_rows(rows: list[dict], out_dir: Path, status: str) -> tuple[Path, int]
 
 def write_manifest(out_dir: Path, payload: dict) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "fightodds_props_cycle_latest.json").write_text(
-        json.dumps(payload, indent=2), encoding="utf-8"
-    )
+    atomic_json(out_dir / "fightodds_props_cycle_latest.json", payload)
 
 
 def main() -> int:
@@ -223,7 +230,18 @@ def main() -> int:
         return 0 if succeeded else 2
     status = "complete" if not failed else "partial"
     path, written = write_rows(rows, args.out_dir, status)
+    snapshot_rows = []
+    for row in rows:
+        item = dict(row)
+        item["cycle_status"] = status
+        snapshot_rows.append(item)
+    snapshot = atomic_csv(
+        args.out_dir / "fightodds_props_snapshot_latest.csv",
+        snapshot_rows,
+        PROP_FIELDS,
+    )
     write_manifest(args.out_dir, {
+        "contract": "FIGHTODDS-PROPS-CURRENT-SNAPSHOT-1",
         "poll_time": poll_iso,
         "status": status,
         "requested_pks": [event["pk"] for event in events],
@@ -232,6 +250,7 @@ def main() -> int:
         "observed_outcomes": len(rows),
         "invalid_outcomes": invalid,
         "rows_written": written,
+        "snapshot": snapshot,
     })
     print(f"cycle {status}: {len(rows)} observed, {written} appended -> {path.name}")
     return 0
