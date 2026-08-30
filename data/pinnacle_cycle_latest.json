@@ -1,14 +1,14 @@
 {
   "contract": "PINNACLE-CURRENT-SNAPSHOT-1",
   "league_id": 1624,
-  "markets_received": 13,
-  "matchups_received": 13,
-  "poll_time": "2026-08-30T17:59:22.399299+00:00",
+  "markets_received": 18,
+  "matchups_received": 18,
+  "poll_time": "2026-08-30T20:54:21.221848+00:00",
   "snapshot": {
-    "bytes": 4605,
+    "bytes": 6336,
     "path": "pinnacle_snapshot_latest.csv",
-    "rows": 26,
-    "sha256": "c13c462ff49452c3c8fe4429f8cd5b02f0ad166d51bed858978dfb575e77d859"
+    "rows": 36,
+    "sha256": "668cac5435934c578d7ef3e90e21cb8320bb106c50e4cee9638d958477d47885"
   },
   "status": "complete"
 }
