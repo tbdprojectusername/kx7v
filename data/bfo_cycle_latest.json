@@ -3,24 +3,26 @@
   "failed_event_slugs": [
     "noche-ufc-4318"
   ],
-  "poll_time": "2026-09-01T19:38:10.630764+00:00",
+  "poll_time": "2026-09-01T19:48:23.826759+00:00",
   "requested_event_slugs": [
     "noche-ufc-4318",
     "ufc-331-4302",
+    "ufc-331-4303",
     "ufc-332-4330",
     "ufc-333-4321",
     "ufc-fight-night-4326",
     "ufc-glendale-4328"
   ],
   "snapshot": {
-    "bytes": 30558,
+    "bytes": 35403,
     "path": "bfo_snapshot_latest.csv",
-    "rows": 228,
-    "sha256": "a8bfd6d9de43fd08eb65dd63187a46ee1070e4be2f222277a365cfad68d0007f"
+    "rows": 268,
+    "sha256": "3fc23a2f8fe3a6029a5f75aab4121ef1a42b741f5a9c06083bd8592af618ab20"
   },
   "status": "partial",
   "succeeded_event_slugs": [
     "ufc-331-4302",
+    "ufc-331-4303",
     "ufc-332-4330",
     "ufc-333-4321",
     "ufc-fight-night-4326",
