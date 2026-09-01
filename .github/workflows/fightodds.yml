@@ -23,6 +23,7 @@ on:
 
 permissions:
   contents: write
+  actions: write    # self-chaining dispatch
 
 concurrency:
   group: fightodds
@@ -113,3 +114,14 @@ jobs:
             [ "$i" -lt 6 ] && sleep 540
           done
           [ "$PUSH_FAIL" -eq 0 ] || { echo "::error::a poll commit failed to push"; exit 1; }
+
+      - name: Chain the next run
+        # GitHub throttles cron hard (observed: hourly schedules firing ~every
+        # 5h, leaving multi-hour capture gaps). A successful run dispatches its
+        # own successor; the concurrency group queues it until this run exits,
+        # so coverage is continuous. Cron stays as the recovery path if the
+        # chain ever breaks. Failure does NOT chain (no failure loops).
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run fightodds.yml -R "$GITHUB_REPOSITORY" || echo "::warning::self-chain dispatch failed; cron fallback remains"
