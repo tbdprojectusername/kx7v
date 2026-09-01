@@ -38,7 +38,14 @@ jobs:
           PIN_OK=0
           for i in 1 2 3 4 5; do
             echo "=== poll $i of 5 ==="
-            if python poll_bfo.py --out-dir data; then
+            # exit 0 = clean, exit 2 = PARTIAL (quotes published, some event
+            # pages degraded — e.g. a card whose page parses zero quotes after a
+            # headliner swap). Partial still counts as a successful poll: the
+            # cycle manifest records status "partial" + the failed slugs, and
+            # freshness alerts watch staleness. Only a fully aborted cycle
+            # (nothing published, exit 1) leaves BFO_OK unset.
+            python poll_bfo.py --out-dir data; rc=$?
+            if [ "$rc" -eq 0 ] || [ "$rc" -eq 2 ]; then
               BFO_OK=1
             else
               echo "BFO_FAILED=1" >> "$GITHUB_ENV"
