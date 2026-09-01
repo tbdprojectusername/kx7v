@@ -45,7 +45,9 @@ jobs:
             # cycle manifest records status "partial" + the failed slugs, and
             # freshness alerts watch staleness. Only a fully aborted cycle
             # (nothing published, exit 1) leaves BFO_OK unset.
-            python poll_bfo.py --out-dir data; rc=$?
+            # `|| rc=$?` keeps the capture exempt from the step's `set -e`
+            # (a bare `cmd; rc=$?` dies on non-zero before rc is read)
+            rc=0; python poll_bfo.py --out-dir data || rc=$?
             if [ "$rc" -eq 0 ] || [ "$rc" -eq 2 ]; then
               BFO_OK=1
             else
