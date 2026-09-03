@@ -1,7 +1,11 @@
 {
   "contract": "BFO-CURRENT-SNAPSHOT-1",
-  "failed_event_slugs": [],
-  "poll_time": "2026-09-03T08:26:42.515374+00:00",
+  "failed_event_slugs": [
+    "noche-ufc-4318",
+    "ufc-331-4302",
+    "ufc-glendale-4328"
+  ],
+  "poll_time": "2026-09-03T08:36:59.240190+00:00",
   "requested_event_slugs": [
     "noche-ufc-4318",
     "ufc-331-4302",
@@ -12,19 +16,16 @@
     "ufc-glendale-4328"
   ],
   "snapshot": {
-    "bytes": 44986,
+    "bytes": 32202,
     "path": "bfo_snapshot_latest.csv",
-    "rows": 344,
-    "sha256": "7d7ad80e629d6037fd9c6eb75a898e8eb4760fd6341445eec48e869f7314f7cd"
+    "rows": 240,
+    "sha256": "ee35ecb926dce8063d446b6cbcc3009841462d5d2cc982d138c4e25658ea941b"
   },
-  "status": "complete",
+  "status": "partial",
   "succeeded_event_slugs": [
-    "noche-ufc-4318",
-    "ufc-331-4302",
     "ufc-331-4303",
     "ufc-332-4330",
     "ufc-333-4321",
-    "ufc-fight-night-4326",
-    "ufc-glendale-4328"
+    "ufc-fight-night-4326"
   ]
 }
