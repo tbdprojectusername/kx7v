@@ -32,7 +32,13 @@ concurrency:
 jobs:
   poll:
     runs-on: ubuntu-latest
-    timeout-minutes: 58
+    # 2026-09-03: was 58. Each poll cycle now takes ~3 min (moneylines + props over
+    # a fuller event list) and the loop slept its way past the cap — every run since
+    # 09-02T16:42Z was killed at minute 58 during the sleep before poll 6, after five
+    # good commits. A killed job never chains its successor, so capture fell back to
+    # throttled cron (~5h gaps) and the warehouse health gate refused. The loop below
+    # is now deadline-aware and exits successfully; this cap is headroom, not the plan.
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -64,7 +70,23 @@ jobs:
           git config user.email "actions@github.com"
           git config merge.keepmine.driver "true"
           PUSH_FAIL=0
+          # Deadline-aware loop: never start a sleep+poll that cannot finish inside
+          # BUDGET seconds. Uses the previous cycle's measured duration as the
+          # estimate, so a slower event list just yields fewer polls per job (the
+          # self-chained successor picks up immediately) instead of a timeout kill.
+          JOB_START=$(date +%s)
+          BUDGET=3300          # 55 min
+          LAST_CYCLE=240       # conservative first estimate (4 min)
           for i in 1 2 3 4 5 6; do
+            if [ "$i" -gt 1 ]; then
+              ELAPSED=$(( $(date +%s) - JOB_START ))
+              if [ $(( ELAPSED + 540 + LAST_CYCLE + 60 )) -gt "$BUDGET" ]; then
+                echo "budget: ${ELAPSED}s elapsed, next sleep+poll would overrun ${BUDGET}s — ending after $((i-1)) polls; successor chains now"
+                break
+              fi
+              sleep 540
+            fi
+            CYCLE_START=$(date +%s)
             echo "=== fightodds poll $i of 6 ==="
             set +e
             python poll_fightodds.py --out-dir data
@@ -111,7 +133,8 @@ jobs:
             else
               echo "no new rows on poll $i"
             fi
-            [ "$i" -lt 6 ] && sleep 540
+            LAST_CYCLE=$(( $(date +%s) - CYCLE_START ))
+            echo "cycle $i took ${LAST_CYCLE}s"
           done
           [ "$PUSH_FAIL" -eq 0 ] || { echo "::error::a poll commit failed to push"; exit 1; }
 
