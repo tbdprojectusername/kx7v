@@ -1,7 +1,7 @@
 {
   "contract": "BFO-CURRENT-SNAPSHOT-1",
   "failed_event_slugs": [],
-  "poll_time": "2026-09-03T21:42:12.450077+00:00",
+  "poll_time": "2026-09-03T21:52:30.129596+00:00",
   "requested_event_slugs": [
     "noche-ufc-4318",
     "ufc-331-4302",
@@ -12,10 +12,10 @@
     "ufc-glendale-4328"
   ],
   "snapshot": {
-    "bytes": 44965,
+    "bytes": 44962,
     "path": "bfo_snapshot_latest.csv",
     "rows": 344,
-    "sha256": "31dde3636d13fbd5c903a584c59851ecb84b4496e9fb5e83a712ee4bbffe0e70"
+    "sha256": "89ecfd4d29f6f8a5bdd9f7ae4ec7952df76580a6af86127b4b874e59c052e70b"
   },
   "status": "complete",
   "succeeded_event_slugs": [
