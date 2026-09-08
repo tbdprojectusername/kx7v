@@ -1,5 +1,23 @@
 {
-  "poll_time": "2026-09-08T03:31:11.389018+00:00",
-  "reason": "HTML challenge page (HTTP 502)",
-  "status": "aborted"
+  "contract": "FIGHTODDS-PROPS-CURRENT-SNAPSHOT-1",
+  "failed_pks": [],
+  "invalid_outcomes": 0,
+  "observed_outcomes": 2305,
+  "poll_time": "2026-09-08T03:40:57.122092+00:00",
+  "requested_pks": [
+    9109,
+    9700
+  ],
+  "rows_written": 87,
+  "snapshot": {
+    "bytes": 948012,
+    "path": "fightodds_props_snapshot_latest.csv",
+    "rows": 2305,
+    "sha256": "8d22cc0dc1b146a64af1786880b9d571975906452a7d32ded3fe39748069fc41"
+  },
+  "status": "complete",
+  "succeeded_pks": [
+    9109,
+    9700
+  ]
 }
