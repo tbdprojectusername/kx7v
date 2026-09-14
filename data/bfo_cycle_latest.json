@@ -1,7 +1,7 @@
 {
   "contract": "BFO-CURRENT-SNAPSHOT-1",
   "failed_event_slugs": [],
-  "poll_time": "2026-09-14T11:56:08.765764+00:00",
+  "poll_time": "2026-09-14T12:06:42.006051+00:00",
   "requested_event_slugs": [
     "ufc-331-4302",
     "ufc-331-4358",
@@ -12,7 +12,7 @@
     "bytes": 22602,
     "path": "bfo_snapshot_latest.csv",
     "rows": 184,
-    "sha256": "ccb0fb5c2d2819199906ce06f0a2c8d064771c526119106993d9d0a3e46dbaa9"
+    "sha256": "68ae54c68624f26163cec3e5e8d02ed2a08242ab34b2e6c365bd5b39c279ec28"
   },
   "status": "complete",
   "succeeded_event_slugs": [
