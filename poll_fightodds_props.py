@@ -35,6 +35,7 @@ from poll_fightodds import (
     gql,
 )
 from snapshot_io import atomic_csv, atomic_json
+from monthly_roll import append_target, month_parts
 
 
 EXCLUDED_CATEGORIES = {"A_1", "A_2"}
@@ -164,10 +165,13 @@ def poll_event(session, pacer: Pacer, event: dict, poll_iso: str) -> tuple[list[
 
 def write_rows(rows: list[dict], out_dir: Path, status: str) -> tuple[Path, int]:
     now = pd.Timestamp.now(tz="UTC")
-    path = out_dir / f"fightodds_props_{now:%Y-%m}.csv"
+    ym = f"{now:%Y-%m}"
+    path = append_target(out_dir, "fightodds_props", ym)
     previous: dict[tuple[str, str, str], pd.Series] = {}
-    if path.exists():
-        frame = pd.read_csv(path, dtype=str, keep_default_na=False)
+    parts = month_parts(out_dir, "fightodds_props", ym)   # every part: change detection spans the month
+    if parts:
+        frame = pd.concat([pd.read_csv(p, dtype=str, keep_default_na=False) for p in parts],
+                          ignore_index=True)
         frame = frame.sort_values("poll_time").groupby(
             ["offer_id", "outcome_id", "book"], as_index=False, dropna=False
         ).tail(1)

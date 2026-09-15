@@ -45,6 +45,7 @@ from pathlib import Path
 import pandas as pd
 from curl_cffi import requests as creq
 from snapshot_io import atomic_csv, atomic_json
+from monthly_roll import append_target, month_parts
 
 import base64 as _b64
 GQL = _b64.b64decode("aHR0cHM6Ly9hcGkuZmlnaHRvZGRzLmlvL2dxbA==").decode()
@@ -400,7 +401,8 @@ def write_rows(rows: list[dict], out_dir, status: str):
     fight before the identifiability floor landed on 2026-08-16).
     """
     now = pd.Timestamp.now(tz="UTC")
-    path = Path(out_dir) / f"fightodds_{now:%Y-%m}.csv"
+    ym = f"{now:%Y-%m}"
+    path = append_target(out_dir, "fightodds", ym)
     # NOT "fightodds_*": every private consumer selected capture files by feed
     # prefix, so a sidecar in that namespace would have been synced as one of the
     # two most recent monthly files and concatenated straight back into live
@@ -418,9 +420,10 @@ def write_rows(rows: list[dict], out_dir, status: str):
             for row in held
         ]).to_csv(qpath, mode="a", header=not qpath.exists(), index=False)
     prev_latest = {}
-    if path.exists():
+    parts = month_parts(out_dir, "fightodds", ym)   # every part: change detection spans the month
+    if parts:
         try:
-            prev = pd.read_csv(path, dtype=str).fillna("")
+            prev = pd.concat([pd.read_csv(p_, dtype=str) for p_ in parts], ignore_index=True).fillna("")
             prev = prev.sort_values("poll_time").groupby(
                 ["fight_slug", "book"], as_index=False).tail(1)
             for _, r in prev.iterrows():

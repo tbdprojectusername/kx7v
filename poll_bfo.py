@@ -36,6 +36,7 @@ from curl_cffi import requests
 from snapshot_io import atomic_csv, atomic_json
 
 import base64 as _b64
+from monthly_roll import append_target
 BASE = _b64.b64decode("aHR0cHM6Ly93d3cuYmVzdGZpZ2h0b2Rkcy5jb20=").decode()
 FIELDS = ["poll_time", "event_slug", "event_name", "matchup_id", "side",
           "selection", "row_kind", "book_id", "book", "american", "move_arrow"]
@@ -278,7 +279,7 @@ def main() -> int:
     )
 
     os.makedirs(a.out_dir, exist_ok=True)
-    path = os.path.join(a.out_dir, f"bfo_{poll[:7]}.csv")
+    path = str(append_target(a.out_dir, "bfo", poll[:7]))
     new = not os.path.exists(path)
     with open(path, "a", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=FIELDS)

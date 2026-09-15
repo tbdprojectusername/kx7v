@@ -28,6 +28,7 @@ import requests
 from snapshot_io import atomic_csv, atomic_json
 
 import base64 as _b64
+from monthly_roll import append_target
 BASE_URL = _b64.b64decode("aHR0cHM6Ly9ndWVzdC5hcGkuYXJjYWRpYS5waW5uYWNsZS5jb20vMC4x").decode()
 GUEST_API_KEY = os.environ.get("PINNACLE_API_KEY",
                                "CmX2KcMrXuFmNg6YFbmTxE0y9CIrOi0R")
@@ -156,7 +157,7 @@ def main() -> int:
         return 0
 
     os.makedirs(a.out_dir, exist_ok=True)
-    path = os.path.join(a.out_dir, f"pinnacle_{poll[:7]}.csv")
+    path = str(append_target(a.out_dir, "pinnacle", poll[:7]))
     new = not os.path.exists(path)
     with open(path, "a", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=FIELDS)
