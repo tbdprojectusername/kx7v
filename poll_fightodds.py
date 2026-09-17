@@ -216,14 +216,19 @@ def gql(sess, pacer: Pacer, query: str, variables: dict) -> dict:
             continue
         if r.status_code == 403:
             raise CycleAbort("HTTP 403 — blocked/challenged; not retrying")
-        if "text/html" in str(r.headers.get("content-type", "")).lower():
-            raise CycleAbort(f"HTML challenge page (HTTP {r.status_code})")
         if r.status_code >= 500:
+            # Judged BEFORE the challenge-page check: upstream 5xx errors come
+            # with an HTML error body, and reading that body as a bot challenge
+            # aborted the whole cycle on every transient 502 (9 of the 11
+            # aborts on 2026-09-16). A 5xx is a soft failure — retry, then fail
+            # the one call — regardless of what the body looks like.
             soft_fails += 1
             if soft_fails > 2:
                 raise EventFailed(f"HTTP {r.status_code} after retries")
             time.sleep(2 * soft_fails + random.uniform(0, 1))
             continue
+        if "text/html" in str(r.headers.get("content-type", "")).lower():
+            raise CycleAbort(f"HTML challenge page (HTTP {r.status_code})")
         if r.status_code != 200:
             raise EventFailed(f"HTTP {r.status_code}")
         try:
