@@ -468,9 +468,18 @@ def write_snapshot(rows: list[dict], out_dir: str, poll_iso: str, status: str) -
 
 def write_manifest(out_dir, poll_iso, requested, succeeded, failed, rows_written, status,
                    snapshot=None):
-    """Per-cycle health record — the authoritative freshness/liveness signal."""
+    """Per-cycle health record — the authoritative freshness/liveness signal.
+
+    An ABORTED cycle publishes nothing, so it must not overwrite the manifest of
+    the last cycle that did: the warehouse gate reads `status` and refused the
+    whole feed on every transient upstream abort (11 on 2026-09-16 alone, each
+    failing one d6mw run) while the snapshot beside it was minutes old and
+    healthy. Aborts go to `fightodds_cycle_last_abort.json`; staleness is then
+    what the gate measures — the snapshot's age — which is the right signal.
+    """
     Path(out_dir).mkdir(exist_ok=True)
-    atomic_json(Path(out_dir) / "fightodds_cycle_latest.json", {
+    name = "fightodds_cycle_last_abort.json" if status == "aborted" else "fightodds_cycle_latest.json"
+    atomic_json(Path(out_dir) / name, {
         "contract": "FIGHTODDS-CURRENT-SNAPSHOT-1",
         "poll_time": poll_iso, "status": status, "requested_pks": requested,
         "succeeded_pks": succeeded, "failed_pks": failed,

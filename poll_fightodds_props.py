@@ -196,8 +196,12 @@ def write_rows(rows: list[dict], out_dir: Path, status: str) -> tuple[Path, int]
 
 
 def write_manifest(out_dir: Path, payload: dict) -> None:
+    """An aborted cycle published nothing, so it lands in the sidecar and the last
+    good manifest stays authoritative (see poll_fightodds.write_manifest)."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    atomic_json(out_dir / "fightodds_props_cycle_latest.json", payload)
+    name = ("fightodds_props_cycle_last_abort.json" if payload.get("status") == "aborted"
+            else "fightodds_props_cycle_latest.json")
+    atomic_json(out_dir / name, payload)
 
 
 def main() -> int:

@@ -264,7 +264,9 @@ def main() -> int:
 
     if not rows:
         log(f"poll {poll}: parsed 0 quotes — SA layout probably changed")
-        atomic_json(Path(a.out_dir) / "bfo_cycle_latest.json", {
+        # sidecar, not the manifest: nothing was published, so the last good
+        # cycle stays authoritative and the gate judges the snapshot's AGE
+        atomic_json(Path(a.out_dir) / "bfo_cycle_last_abort.json", {
             "contract": "BFO-CURRENT-SNAPSHOT-1", "poll_time": poll,
             "status": "aborted", "requested_event_slugs": [
                 href.rstrip("/").split("/")[-1] for href in sorted(targets)
