@@ -3,23 +3,25 @@
   "failed_event_slugs": [
     "ufc-bjj-11-4375"
   ],
-  "poll_time": "2026-09-24T21:21:28.663980+00:00",
+  "poll_time": "2026-09-24T21:31:48.512395+00:00",
   "requested_event_slugs": [
     "ufc-332-4330",
+    "ufc-332-4378",
     "ufc-333-4321",
     "ufc-334-4370",
     "ufc-bjj-11-4375",
     "ufc-vegas-121-4368"
   ],
   "snapshot": {
-    "bytes": 27427,
+    "bytes": 28395,
     "path": "bfo_snapshot_latest.csv",
-    "rows": 208,
-    "sha256": "339d900e12c1ca3466826136010d6dbf79814dab69afa6d8e9e8723e20c7d8a7"
+    "rows": 216,
+    "sha256": "225a757ce957171ceeec52e2be9bbfd4fc332e30f70b19c68a8a0ad7100594ef"
   },
   "status": "partial",
   "succeeded_event_slugs": [
     "ufc-332-4330",
+    "ufc-332-4378",
     "ufc-333-4321",
     "ufc-334-4370",
     "ufc-vegas-121-4368"
