@@ -3,17 +3,17 @@
   "failed_pks": [],
   "invalid_outcomes": 0,
   "observed_outcomes": 196,
-  "poll_time": "2026-10-04T03:51:32.092833+00:00",
+  "poll_time": "2026-10-04T04:01:17.488703+00:00",
   "requested_pks": [
     9105,
     9736
   ],
   "rows_written": 0,
   "snapshot": {
-    "bytes": 81614,
+    "bytes": 81650,
     "path": "fightodds_props_snapshot_latest.csv",
     "rows": 196,
-    "sha256": "c963b0e51fc2894eace92862e24ff2fa7b58a5822e6f22f2ea25afa935f81a16"
+    "sha256": "da8bfc56b417e7fdab179e650053fba1c349b319b9a554153be1ed212e9c28be"
   },
   "status": "complete",
   "succeeded_pks": [
