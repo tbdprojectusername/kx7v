@@ -1,6 +1,14 @@
 {
   "contract": "PINNACLE-CURRENT-SNAPSHOT-1",
-  "poll_time": "2026-10-05T20:56:32.752623+00:00",
-  "reason": "RuntimeError('failed /leagues/1624/matchups: HTTP 403')",
-  "status": "aborted"
+  "league_id": 1624,
+  "markets_received": 21,
+  "matchups_received": 21,
+  "poll_time": "2026-10-05T21:07:09.337152+00:00",
+  "snapshot": {
+    "bytes": 7372,
+    "path": "pinnacle_snapshot_latest.csv",
+    "rows": 42,
+    "sha256": "a17f298db13213f580b7406e5ee81db1d7d6e98bd8a5a7be0ae6ba60f0489cf3"
+  },
+  "status": "complete"
 }
