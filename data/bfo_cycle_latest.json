@@ -1,7 +1,7 @@
 {
   "contract": "BFO-CURRENT-SNAPSHOT-1",
   "failed_event_slugs": [],
-  "poll_time": "2026-10-13T15:40:44.779358+00:00",
+  "poll_time": "2026-10-13T15:51:05.806691+00:00",
   "requested_event_slugs": [
     "ufc-333-4321",
     "ufc-334-4370",
@@ -10,10 +10,10 @@
     "ufc-edmonton-4403"
   ],
   "snapshot": {
-    "bytes": 28037,
+    "bytes": 28034,
     "path": "bfo_snapshot_latest.csv",
     "rows": 216,
-    "sha256": "df2c73931d52cc8a5a1ee90cc6088b10a2549189d3defb24459fbf7ea180ddbc"
+    "sha256": "ffbd101c527c62d592d1f9a0bb5d2bacc1ddf08dae4185a44ee19a4ae365b9db"
   },
   "status": "complete",
   "succeeded_event_slugs": [
