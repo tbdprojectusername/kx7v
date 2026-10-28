@@ -5,7 +5,7 @@
     "ufc-bjj-13-4434",
     "ufc-sydney-4436"
   ],
-  "poll_time": "2026-10-28T23:11:22.091385+00:00",
+  "poll_time": "2026-10-28T23:21:42.257081+00:00",
   "requested_event_slugs": [
     "ufc-334-4370",
     "ufc-334-4433",
@@ -13,19 +13,21 @@
     "ufc-bjj-13-4434",
     "ufc-sydney-4436",
     "ufc-vegas-123-4427",
-    "ufc-vegas-124-4437"
+    "ufc-vegas-124-4437",
+    "ufc-vegas-124-4439"
   ],
   "snapshot": {
-    "bytes": 29375,
+    "bytes": 30189,
     "path": "bfo_snapshot_latest.csv",
-    "rows": 222,
-    "sha256": "4d9958ef3795c720e464afd68b87730754c1d47f4acd6df3967c53f451becc18"
+    "rows": 228,
+    "sha256": "b278d15866041a1982796261dcf39177823fe67895f37577071ac3a63b0a1d7b"
   },
   "status": "partial",
   "succeeded_event_slugs": [
     "ufc-334-4370",
     "ufc-335-4394",
     "ufc-vegas-123-4427",
-    "ufc-vegas-124-4437"
+    "ufc-vegas-124-4437",
+    "ufc-vegas-124-4439"
   ]
 }
