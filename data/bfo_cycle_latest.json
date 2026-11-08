@@ -1,7 +1,7 @@
 {
   "contract": "BFO-CURRENT-SNAPSHOT-1",
   "failed_event_slugs": [],
-  "poll_time": "2026-11-08T03:31:28.538041+00:00",
+  "poll_time": "2026-11-08T03:33:01.098288+00:00",
   "requested_event_slugs": [
     "ufc-334-4370",
     "ufc-334-4433",
@@ -12,10 +12,10 @@
     "ufc-vegas-124-4439"
   ],
   "snapshot": {
-    "bytes": 45489,
+    "bytes": 45492,
     "path": "bfo_snapshot_latest.csv",
     "rows": 350,
-    "sha256": "c8ba885cf6873b19da89f519b34d1b2df95d3dac8908f01663a37e32830d11f0"
+    "sha256": "7ae040db7cf871f85569b31fb5f76b983e1724341010a8d059d2885a83966f31"
   },
   "status": "complete",
   "succeeded_event_slugs": [
