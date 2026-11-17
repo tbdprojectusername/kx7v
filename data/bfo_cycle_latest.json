@@ -1,7 +1,7 @@
 {
   "contract": "BFO-CURRENT-SNAPSHOT-1",
   "failed_event_slugs": [],
-  "poll_time": "2026-11-17T15:00:18.176196+00:00",
+  "poll_time": "2026-11-17T15:10:35.901287+00:00",
   "requested_event_slugs": [
     "ufc-335-4394",
     "ufc-doha-4440",
@@ -12,7 +12,7 @@
     "bytes": 25624,
     "path": "bfo_snapshot_latest.csv",
     "rows": 202,
-    "sha256": "a59381bba3de545f7252cb7df7aa1e50ab129e67020e057d4c3fb5d8c3f019d9"
+    "sha256": "b64a3ba2e8794d97b0d09fad658004e0fa660decc4a3b525852e28256b23a1f9"
   },
   "status": "complete",
   "succeeded_event_slugs": [
